@@ -19,6 +19,8 @@ class STLConverter:
         self.pending_jump = None
         self.pending_instructions: List[str] = []   # buffered assignments (strings)
     
+        self.pending_flank = None
+
     # Boolean helpers
     def push_and(self, x: Expr): self.expr = x if self.expr is None else And(self.expr, x)
     def push_or(self, x: Expr): self.expr = x if self.expr is None else Or(self.expr, x)
@@ -198,15 +200,39 @@ class STLConverter:
             self.store(operand); return
     
     def handle_flank(self, opcode: str, operand: str):
-        input_expr = emit_expr(self.expr)
-        helper = operand
-        target = self.stack.pop() if self.stack else None
+        """
+            Handle rising (FP) or falling (FN) edge detection.
+            STL pattern:
+                A <input>
+                FP <helper>
+                = <target>
+            Becomes in SCL:
+                IF <input> AND NOT <helper> THEN
+                    <target> := true
+                ELSE
+                    <target> := false
+                END_IF;
+                <helper> := <input>;
+        """
+        # opcode is "FP" or "FN"; operand is helper var (e.g. "#FPhulp_TijdPuls")
+        if self.expr is None:
+            print(f"Warning {opcode} without input expression; skipping")
+            return
 
-        self.out.append(
-            f"\t{target} := {input_expr} AND NOT {helper}\n"
-            f"\t{helper} := {input_expr}\n"
-        )
-        self.expr = None
+        # Keep the original input expression object (not its string)
+        original_input_expr = self.expr
+
+        # Build the pulse expression for storage:
+        if opcode == "FP":
+            pulse_expr = And(original_input_expr, Not(Var(operand)))
+        else:  # "FN"
+            pulse_expr = And(Not(original_input_expr), Var(operand))
+
+        # Replace current expr with pulse_expr so '=' will store it using existing store() logic
+        self.expr = pulse_expr
+
+        # Remember helper + original input so we can emit helper := input after the '=' store
+        self._pending_flank = {"helper": operand, "input_expr": original_input_expr}
         return
     
     # Data / arithmetic / operators

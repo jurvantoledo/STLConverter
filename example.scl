@@ -137,11 +137,12 @@ REGION "INIT"
 	#t_MaxWaardeVoorOverflow := 254;
 	#t_MaxWaardeOverflowDINT := 254;
 	#t_MaxWaardeTijdOmrek := DINT#36000;//59;
-	Num(value='DINT#36000;//59') := #i_TijdPuls AND NOT #FPhulp_TijdPuls
-	#FPhulp_TijdPuls := #i_TijdPuls
-	#FP_TijdPuls := 254;
-	Num(value='254') := #i_Reset AND NOT #FPhulp_Reset
-	#FPhulp_Reset := #i_Reset
+	#FP_TijdPuls := DINT#36000;//59;
+	IF #i_TijdPuls AND NOT #FPhulp_TijdPuls THEN
+		#FP_TijdPuls := true
+	ELSE
+		#FP_TijdPuls := false
+	END_IF
 END_REGION
 
 END_FUNCTION_BLOCK
