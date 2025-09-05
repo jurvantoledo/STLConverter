@@ -1,0 +1,441 @@
+﻿FUNCTION_BLOCK "spVriBypass"
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : TAI_NW
+VERSION : 0.1
+   VAR_INPUT 
+      i_initialiseren : Bool;
+   END_VAR
+
+   VAR_IN_OUT 
+      io_kvfd : "spVriBypassInterfacesKvfd";
+      io_sp : "spVriBypassInterfacesSp";
+   END_VAR
+
+   VAR 
+      s_bestuurbaar : Bool;
+      s_niet_bestuurbaar_door_storing { S7_SetPoint := 'True'} : Bool;
+      s_overspanningsbeveiliging_storing : Bool;
+      s_reset : Bool;
+      s_bypass_aanvragen_actief : Bool;
+      s_bypass_opheffen_actief : Bool;
+      s_initieel : Bool;
+      s_cmndVraagAan : Bool;
+      s_cmndHefOp : Bool;
+      s_cmndVoerAlgemeneResetUit : Bool;
+      s_zetModeContinuIn : Bool;
+      s_zetModeContinuUit : Bool;
+      s_cmndZetModeRegulier : Bool;
+      s_zetNoodbedieningTechnischGeactiveerd : Bool;
+      s_zetNoodstroombedrijf : Bool;
+      s_vraagBypassAan : Bool;
+      ts_timer_bypass_opheffen {InstructionName := 'IEC_TIMER'; LibVersion := '1.0'} : IEC_TIMER;
+      ts_timer_bypass_instellen {InstructionName := 'IEC_TIMER'; LibVersion := '1.0'} : IEC_TIMER;
+      s_timer_bypass_opheffen : "dtcTimer";
+      s_timer_bypass_instellen : "dtcTimer";
+   END_VAR
+
+   VAR_TEMP 
+      c_td_bypass_timeout : Time;
+      c_td_bypass_bevestiging : Time;
+   END_VAR
+
+
+BEGIN
+	// ============================================================================
+	REGION Initialisatie
+	    // ============================================================================
+	    // Reset alle statische variabelen naar initiele waarden
+	    IF #i_initialiseren THEN
+	        #s_bestuurbaar := true;
+	        #s_niet_bestuurbaar_door_storing := false;
+	        #s_overspanningsbeveiliging_storing := false;
+	        #s_bypass_aanvragen_actief := false;
+	        #s_bypass_opheffen_actief := false;
+	        #s_reset := false;
+	        #s_initieel := true;
+	        
+	        // Timer resets
+	        #s_timer_bypass_instellen.timerStart := false;
+	        #s_timer_bypass_opheffen.timerStart := false;
+	    END_IF;
+	END_REGION
+	
+	// ============================================================================
+	REGION Intern
+	// ============================================================================
+	    REGION CONFIGURATIE
+	        #c_td_bypass_timeout := t#5s;        // Timeout voor bypass operaties
+	        #c_td_bypass_bevestiging := t#5s;     // Bevestigingstijd voor bypass
+	    END_REGION
+	    
+	    REGION commando's op stat
+	        // VRI Bypass commandos naar static variabelen
+	        
+	        REGION VraagBypassAan commando op stat
+	            #s_cmndVraagAan := #s_bestuurbaar AND
+	            #io_kvfd.commandos.VraagBypassAan;
+	        END_REGION
+	        
+	        REGION HefBypassOp commando op stat
+	            #s_cmndHefOp := #s_bestuurbaar AND
+	            #io_kvfd.commandos.HefBypassOp;
+	        END_REGION
+	        
+	        REGION ZetModeRegulier commando op stat
+	            #s_cmndZetModeRegulier := #s_bestuurbaar AND
+	            #io_kvfd.commandos.ZetModeRegulier;
+	        END_REGION
+	        
+	        REGION ZetModeContinuIn commando op stat
+	            #s_zetModeContinuIn := #s_bestuurbaar AND
+	            #io_kvfd.commandos.ZetModeContinuIn;
+	        END_REGION
+	        
+	        REGION ZetModeContinuUit commando op stat
+	            #s_zetModeContinuUit := #s_bestuurbaar AND
+	            #io_kvfd.commandos.ZetModeContinuUit;
+	        END_REGION
+	        
+	        REGION VoerAlgemeneResetUit commando op stat
+	            #s_cmndVoerAlgemeneResetUit := #io_kvfd.commandos.VoerAlgemeneResetUit;
+	        END_REGION
+	        
+	        REGION reset commandos
+	            // Reset commandos na verwerking
+	            #io_kvfd.commandos.VraagBypassAan := FALSE;
+	            #io_kvfd.commandos.HefBypassOp := FALSE;
+	            #io_kvfd.commandos.ZetModeRegulier := FALSE;
+	            #io_kvfd.commandos.ZetModeContinuIn := FALSE;
+	            #io_kvfd.commandos.ZetModeContinuUit := FALSE;
+	            #io_kvfd.commandos.VoerAlgemeneResetUit := FALSE;
+	        END_REGION
+	    END_REGION
+	    
+	    REGION commando's nood op stat
+	        #s_zetNoodstroombedrijf := #io_kvfd.commandos.ZetNoodstroombedrijf;
+	        #s_zetNoodbedieningTechnischGeactiveerd := #io_kvfd.commandos.ZetNoodbedieningTechnischGeactiveerd;
+	        
+	        #io_kvfd.commandos.ZetNoodstroombedrijf := FALSE;
+	        #io_kvfd.commandos.ZetNoodbedieningTechnischGeactiveerd := FALSE;
+	    END_REGION
+	    
+	    REGION Timers
+	        // Timer voor bypass instellen
+	        #ts_timer_bypass_instellen.TON(
+	                                       IN := #s_timer_bypass_instellen.timerStart,
+	                                       PT := #c_td_bypass_bevestiging,
+	                                       Q => #s_timer_bypass_instellen.timerOut,
+	                                       ET => #s_timer_bypass_instellen.ET
+	        );
+	        
+	        // Timer voor bypass opheffen
+	        #ts_timer_bypass_opheffen.TON(
+	                                      IN := #s_timer_bypass_opheffen.timerStart,
+	                                      PT := #c_td_bypass_timeout,
+	                                      Q => #s_timer_bypass_opheffen.timerOut,
+	                                      ET => #s_timer_bypass_opheffen.ET
+	        );
+	        
+	        
+	    END_REGION
+	END_REGION
+	
+	// ============================================================================
+	REGION commandos
+	// ============================================================================
+	    REGION VraagBypassAan
+	        IF #s_cmndVraagAan THEN
+	            #s_timer_bypass_instellen.timerStart := true;
+	            
+	            #s_bypass_aanvragen_actief := #s_timer_bypass_instellen.timerOut;
+	        END_IF;
+	    END_REGION
+	
+	    REGION HefBypassOp
+	        IF #s_cmndHefOp THEN
+	            #io_sp.ingangen.bypassGereed := false;
+	            
+	            // Start timer voor opheffen
+	            #s_timer_bypass_opheffen.timerStart := true;
+	
+	            #s_bypass_opheffen_actief := #s_timer_bypass_opheffen.timerOut;
+	            
+	            IF #s_bypass_opheffen_actief THEN
+	                #io_sp.ingangen.opheffenBypassGeaccepteerd := true;
+	            END_IF;
+	        END_IF;
+	    END_REGION
+	
+	    REGION VoerAlgemeneResetUit 
+	        #s_reset := #s_cmndVoerAlgemeneResetUit;
+	    END_REGION
+	
+	    REGION ZetModeContinuIn
+	        // IF #s_commandos.ZetModeContinuIn THEN
+	        //   // Geen beniening
+	        // END_IF;
+	    END_REGION
+	
+	    REGION ZetModeContinuUit
+	        // IF #s_commandos.ZetModeContinuUit THEN
+	        //    // Geen beniening
+	        // END_IF;
+	
+	    END_REGION
+	
+	    REGION ZetModeRegulier
+	        // IF #s_commandos.ZetModeRegulier THEN
+	        //    // Geen beniening
+	        // END_IF;
+	    END_REGION
+	    
+	    REGION ZetNoodbedieningTechnischGeactiveerd 
+	        // Geen acties volgens Pseudo-code
+	    END_REGION
+	    REGION ZetNoodstroombedrijf
+	        // Geen acties volgens Pseudo-code
+	    END_REGION
+	END_REGION
+	
+	// ============================================================================
+	REGION statussen
+	// ============================================================================
+	    REGION StelVRIBypassIn
+	        IF #s_cmndVraagAan THEN
+	            #s_vraagBypassAan := true;
+	        END_IF;
+	        
+	        IF #s_cmndHefOp OR #i_initialiseren THEN
+	            #s_vraagBypassAan := false;
+	        END_IF;
+	    END_REGION
+	
+	
+	    #io_sp.uitgangen.VraagBypassAan := #s_vraagBypassAan;
+	        
+	    REGION statusmachine
+	        IF #s_initieel THEN
+	            // Conditie 1: Alles uit
+	            IF (NOT #io_sp.ingangen.opheffenBypassGeaccepteerd) AND
+	                (NOT #io_sp.ingangen.aanvraagBypassGeaccepteerd) AND
+	                (NOT #io_sp.ingangen.bypassGereed) THEN
+	                #io_sp.uitgangen.VraagBypassAan := false;
+	                #io_kvfd.toestandsvariabelen.bypassOpgeheven := true;
+	                #io_kvfd.toestandsvariabelen.bypassIngesteld := false;
+	                
+	                // Conditie 2: Bypass wordt opgeheven
+	            ELSIF #io_sp.ingangen.opheffenBypassGeaccepteerd AND NOT #io_sp.ingangen.bypassGereed THEN
+	                #io_sp.uitgangen.VraagBypassAan := false;
+	                #io_kvfd.toestandsvariabelen.bypassOpgeheven := false;
+	                #io_kvfd.toestandsvariabelen.bypassIngesteld := false;
+	                
+	                // Conditie 3: Bypass aanvraag geaccepteerd    
+	            ELSIF #io_sp.ingangen.aanvraagBypassGeaccepteerd AND NOT #io_sp.ingangen.bypassGereed THEN
+	                #io_sp.uitgangen.VraagBypassAan := true;
+	                #io_kvfd.toestandsvariabelen.bypassOpgeheven := false;
+	                #io_kvfd.toestandsvariabelen.bypassIngesteld := false;
+	                
+	                // Conditie 4: Bypass is gereed (actief)
+	            ELSIF #io_sp.ingangen.bypassGereed THEN
+	                #io_sp.uitgangen.VraagBypassAan := true;
+	                #io_kvfd.toestandsvariabelen.bypassOpgeheven := false;
+	                #io_kvfd.toestandsvariabelen.bypassIngesteld := true;
+	                
+	            END_IF;
+	        END_IF;
+	        
+	        #s_initieel := false;
+	    END_REGION
+	END_REGION
+	
+	// ============================================================================
+	REGION ingangen
+	// ============================================================================
+	    REGION aanvraagBypassGeaccepteerd
+	        IF #s_cmndVraagAan AND
+	            #s_timer_bypass_instellen.timerOut AND
+	            #s_bestuurbaar THEN
+	            #io_sp.ingangen.aanvraagBypassGeaccepteerd := true;
+	        ELSE
+	            #io_sp.ingangen.aanvraagBypassGeaccepteerd := false;
+	        END_IF;
+	    END_REGION
+	
+	    REGION bypassGereed 
+	        IF #io_sp.ingangen.aanvraagBypassGeaccepteerd THEN
+	            #io_sp.ingangen.bypassGereed := true;
+	        ELSE
+	            #io_sp.ingangen.bypassGereed := false;
+	        END_IF;
+	    END_REGION //bypassGereed 
+	
+	    REGION landbouwverkeerNoord
+	        //Description: 
+	        //Datatype: BOOL 
+	        
+	    END_REGION
+	
+	    REGION landbouwverkeerZuid
+	        //Description: 
+	        //Datatype: BOOL 
+	    END_REGION
+	
+	    REGION opheffenBypassGeaccepteerd
+	        IF #s_cmndHefOp AND NOT #io_sp.ingangen.bypassGereed AND
+	            #s_timer_bypass_opheffen.timerOut THEN
+	            #io_sp.ingangen.opheffenBypassGeaccepteerd := true;
+	        ELSE
+	            #io_sp.ingangen.opheffenBypassGeaccepteerd := false;
+	        END_IF;
+	    END_REGION
+	
+	    REGION overspanningsBewaking
+	
+	    END_REGION
+	
+	    REGION vriBypassStoring
+	        // storingssignaal afkomstig uit de VRI -> vriBypassStoring
+	        #io_kvfd.toestandsvariabelen.storingen.storing_vri_meld_storing := #io_sp.ingangen.vriBypassStoring;
+	    END_REGION
+	END_REGION
+	
+	// ============================================================================
+	REGION toestandsvariabelen
+	// ============================================================================
+	    REGION bestuurbaar
+	        // Bestuurbaar zal altijd ja zijn dus dit hoeft niet.
+	        // #io_kvfd.toestandsvariabelen.bestuurbaar := NOT #s_niet_bestuurbaar_door_storing;
+	        #io_kvfd.toestandsvariabelen.bestuurbaar := true;
+	        
+	        #s_bestuurbaar := #io_kvfd.toestandsvariabelen.bestuurbaar;
+	        
+	        #io_kvfd.toestandsvariabelen.bestuurbaar := false;
+	    END_REGION
+	
+	    REGION bypassAanwezig
+	        #io_kvfd.toestandsvariabelen.bypassAanwezig := true;
+	    END_REGION
+	
+	    REGION bypassIngesteld
+	        IF #s_cmndVraagAan AND #io_sp.ingangen.bypassGereed THEN
+	            #io_kvfd.toestandsvariabelen.bypassIngesteld := true;
+	        ELSE
+	            #io_kvfd.toestandsvariabelen.bypassIngesteld := false;
+	        END_IF;
+	
+	    END_REGION
+	
+	    REGION bypassOpgeheven
+	        IF #s_cmndHefOp AND NOT
+	            #io_sp.ingangen.opheffenBypassGeaccepteerd AND NOT
+	            #io_sp.ingangen.bypassGereed THEN
+	            #io_kvfd.toestandsvariabelen.bypassOpgeheven := true;
+	        ELSE
+	            #io_kvfd.toestandsvariabelen.bypassOpgeheven := false;
+	        END_IF;
+	    END_REGION
+	
+	    REGION aanvraagBypassGefaald
+	        // aanvraagBypassGefaald wordt true wanneer:
+	        // 1. Er een commando is gegeven om bypass aan te vragen
+	        // 2. Maar de operatie is gefaald door timeout of andere redenen
+	        
+	        IF #s_cmndVraagAan THEN
+	            // Als we bezig zijn met instellen maar de timer is afgelopen zonder succes
+	            IF #s_timer_bypass_instellen.timerOut AND
+	                NOT #io_sp.ingangen.aanvraagBypassGeaccepteerd THEN
+	                
+	                #io_kvfd.toestandsvariabelen.aanvraagBypassGefaald := true;
+	                
+	                // Of als er een storing is opgetreden tijdens het instellen van de bypass
+	            ELSIF #s_niet_bestuurbaar_door_storing AND #s_bypass_aanvragen_actief THEN
+	                #io_kvfd.toestandsvariabelen.aanvraagBypassGefaald := true;
+	                
+	            ELSE
+	                #io_kvfd.toestandsvariabelen.aanvraagBypassGefaald := false;
+	            END_IF;
+	            
+	            // Reset de faal-status wanneer bypass succesvol is ingesteld
+	        ELSIF #io_sp.ingangen.aanvraagBypassGeaccepteerd
+	            AND #io_sp.ingangen.bypassGereed THEN
+	            #io_kvfd.toestandsvariabelen.aanvraagBypassGefaald := false;
+	        ELSE
+	            // Geen actieve aanvraag = geen faal
+	            #io_kvfd.toestandsvariabelen.aanvraagBypassGefaald := false;
+	        END_IF;
+	    END_REGION
+	
+	    REGION modeVri
+	
+	        #io_kvfd.toestandsvariabelen.modeVri.Regulier := #s_cmndZetModeRegulier;
+	        
+	    END_REGION
+	    
+	    REGION opheffenBypassGefaald
+	        // opheffenBypassGefaald wordt true wanneer:
+	        // 1. Er een commando is gegeven om bypass op te heffen
+	        // 2. Maar de operatie is gefaald door timeout of andere redenen
+	        
+	        IF #s_cmndHefOp THEN
+	            // Als we bezig zijn met opheffen maar de timer is afgelopen zonder succes
+	            IF #s_timer_bypass_opheffen.timerOut AND
+	                #io_sp.ingangen.bypassGereed AND
+	                NOT #io_sp.ingangen.opheffenBypassGeaccepteerd THEN
+	                
+	                #io_kvfd.toestandsvariabelen.opheffenBypassGefaald := true;
+	                
+	                // Of als er een storing is opgetreden tijdens het opheffen
+	            ELSIF #s_niet_bestuurbaar_door_storing AND #s_bypass_opheffen_actief THEN
+	                #io_kvfd.toestandsvariabelen.opheffenBypassGefaald := true;
+	                
+	            ELSE
+	                #io_kvfd.toestandsvariabelen.opheffenBypassGefaald := false;
+	            END_IF;
+	            
+	            // Reset de faal-status wanneer bypass succesvol is opgeheven
+	        ELSE
+	            #io_kvfd.toestandsvariabelen.opheffenBypassGefaald := false;
+	        END_IF;
+	        
+	        
+	    END_REGION
+	    
+	    REGION redenNietBestuurbaar
+	        #s_niet_bestuurbaar_door_storing := #io_kvfd.toestandsvariabelen.redenNietBestuurbaar.storing
+	                                            OR #io_kvfd.toestandsvariabelen.redenNietBestuurbaar.handbediening
+	                                            OR #io_kvfd.toestandsvariabelen.redenNietBestuurbaar.noodstop
+	                                            OR #io_kvfd.toestandsvariabelen.redenNietBestuurbaar.werkschakelaar;
+	 
+	    END_REGION
+	    
+	    REGION storingen
+	        // Op basis van overspanningsbeveiliging uit het veld -> #s_overspanningsbeveiliging_storing
+	        #s_overspanningsbeveiliging_storing := #io_sp.ingangen.overspanningsBewaking;
+	        
+	        #s_niet_bestuurbaar_door_storing := #io_kvfd.toestandsvariabelen.storingen.storing_vri_meld_storing
+	        OR #s_overspanningsbeveiliging_storing
+	        OR #io_kvfd.toestandsvariabelen.storingen.storing_algemeen // Always FALSE
+	        OR #io_kvfd.toestandsvariabelen.storingen.storing_communicatie_uitgevallen; // Always FALSE
+	        
+	    END_REGION
+	 
+	    REGION bypassInstellend
+	
+	    END_REGION
+	END_REGION
+	
+	// ============================================================================
+	REGION uitgangen
+	// ============================================================================
+	    REGION VraagBypassAan
+	        IF #s_vraagBypassAan THEN
+	            #io_sp.uitgangen.VraagBypassAan := true;
+	        ELSE
+	            #io_sp.uitgangen.VraagBypassAan := false;
+	        END_IF;
+	    END_REGION
+	
+	END_REGION
+	
+END_FUNCTION_BLOCK
+
