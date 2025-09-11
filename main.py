@@ -1,56 +1,55 @@
-from lexer.lexer import lexer
-from parser.parser import STLConverter
-from writer import writer
+from typing import List
+from lexer import lexer
+from parser import STLConverter
 
-def split_awl(file: str) -> tuple[list, list, list]:
+def fix_awl(file) -> tuple[List, List, List]:
     header = []
     body = []
     footer = []
-    in_body = False
+    is_header = True
 
-    for line in file.splitlines():
-        # If line = BEGIN added to header part and continue loop
-        if line.strip() == "BEGIN":
-            in_body = True
-            header.append(line)
+    for lines in file.read().splitlines():
+        lines = lines.strip()
+        if len(lines) == 0:
             continue
-        # If line != BEGIN AND != END_FUNCTION add to body
-        if not in_body:
-            header.append(line)
-        elif in_body and not line.strip().startswith("END_FUNCTION"):
-            body.append(line)
 
-        # If line = END_FUNCTION end line set body to false and continue loop
-        if line.strip().startswith("END_FUNCTION"):
-            footer.append(line)
-            in_body = False
-            continue
-    
+        if lines != "NETWORK" and is_header:
+            header.append(lines)
+            is_header = True
+        else:
+            is_header = False
+        
+        if not lines.startswith("BEGIN") and is_header == False and not lines.startswith("END_FUNCTION_BLOCK"):
+            body.append(lines)
+        if lines.startswith("END_FUNCTION_BLOCK") and is_header == False:
+            footer.append(lines)
+
     return header, body, footer
 
+def main():
+    output = []
+    with open("example.awl", 'r') as f:
+        header, body, footer = fix_awl(f)
 
-def main() -> int:
-    with open("example.awl") as f:
-        header, body, footer = split_awl(f.read())
+        tokenized = lexer(body)
 
-    tokenized = lexer(body=body)
+        converter = STLConverter()
 
-    conv = STLConverter()
+        for token in tokenized:
+            token_type = token.get("type")
+            token_value = token.get("value")
 
-    for tokens in tokenized:
-        stl_type = tokens.get("type")
-        value = tokens.get("value")
+            opcode = token.get("opcode")
+            operand = token.get("operand")
+            
+            converter.handle_networks(type=token_type, value=token_value)
+            converter.handle_comment(type=token_type, value=token_value)
+            converter.convert(opcode, operand)
 
-        opcode = tokens.get("opcode")
-        operand = tokens.get("operand")
-        
-        conv.handle(opcode=opcode, operand=operand, stl_type=stl_type, stl_value=value)
+        output = converter.ret_output()
     
-    result = conv.finish()
-
-    writer(header=header, out=result, footer=footer)
+    print(output)
     return 0
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
