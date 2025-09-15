@@ -45,7 +45,7 @@ def main():
             converter.handle_networks(type=token_type, value=token_value)
             converter.handle_comment(type=token_type, value=token_value)
             converter.convert(opcode, operand)
-
+        
         output = converter.ret_output()
     
     print(output)
