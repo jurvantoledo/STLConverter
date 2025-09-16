@@ -8,6 +8,7 @@ class STLConverter:
 
         # Stack to push instructions if not all conditions are made
         self.stack: List[Expr] = []
+        self.opcode_stack: List[str] = []
     
     def close_region(self):
         self.output.append(f'END_REGION')
@@ -41,7 +42,7 @@ class STLConverter:
             self.stack.append(self.expr)
         return self.expr
     
-    def store_assignment(self, operand: str):
+    def store_assignment(self, operand: Var):
         target = operand
         condition = emit_expr(self.expr)
         scl_code = f"IF {condition} THEN\n{target.name} := true;\nELSE\n {target.name} := false;\nEND_IF;\n"
@@ -49,18 +50,40 @@ class STLConverter:
         self.expr = None
         self.stack.clear()
         return
+
+    def store_set_clr(self, operand: Var):
+        target = operand
+        if self.opcode_stack:
+            opcode = self.opcode_stack[-1] #peek
+            if opcode == "SET":
+                scl_code = f"{target.name} := true;\n"
+            else:
+                scl_code = f"{target.name} := false;\n"
+            self.output.append(scl_code)
+        return
     
     def convert_bools(self, opcode: str, operand: str):
+        print(opcode)
+        if opcode == "SET" or opcode == "CLR":
+            self.opcode_stack.append(opcode)
+            return
         if opcode == "A":
+            self.opcode_stack.clear()
             self.convert_and(Var(operand))
         if opcode == "AN":
+            self.opcode_stack.clear()
             self.convert_and(Not(Var(operand)))
         if opcode == "O":
+            self.opcode_stack.clear()
             self.convert_or(Var(operand))
         if opcode == "ON":
+            self.opcode_stack.clear()
             self.convert_or(Not(Var(operand)))
         if opcode == "=":
-            self.store_assignment(Var(operand))
+            if self.opcode_stack:
+                self.store_set_clr(Var(operand))  # consume SET/CLR
+            else:
+                self.store_assignment(Var(operand))
         return
     
     def store_transfers(self, dest: str):
@@ -69,6 +92,8 @@ class STLConverter:
         
             self.expr = emit_expr(Assign(target=dest, expr=var))
             self.output.append(self.expr)
+            self.expr = None
+            self.stack.clear()
         return
 
     def convert_transfers(self, opcode: str, operand: str):
@@ -79,8 +104,12 @@ class STLConverter:
         return self.expr
 
     def convert(self, opcode: str, operand: str):
-        if opcode in ("A", "AN", "O", "ON", "SET", "CLR", "="):
+        if opcode in ("SET", "CLR"):
             self.convert_bools(opcode=opcode, operand=operand)
+
+        if opcode in ("A", "AN", "O", "ON", "="):
+            self.convert_bools(opcode=opcode, operand=operand)
+
         if opcode in ("L", "T"):
             self.convert_transfers(opcode=opcode, operand=operand)
             

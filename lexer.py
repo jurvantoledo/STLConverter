@@ -12,10 +12,13 @@ def lexer(body: List):
             tokenized.append({'type': 'COMMENT', 'value': text})
         else:
             part = text.split(' ')
-            opcode = part[0]
-            operand = part[1].rstrip(";")
+            if (len(part) >= 2):
+                opcode = part[0]
+                operand = part[1].rstrip(";")
 
-            tokenized.append({"type": "INSTRUCTION", 'opcode': opcode, 'operand': operand})
-            continue
+                tokenized.append({"type": "INSTRUCTION", 'opcode': opcode, 'operand': operand})
+                continue
+            else:
+                tokenized.append({"type": "INSTRUCTION", 'opcode': part[0]})
     print(tokenized)
     return tokenized
