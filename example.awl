@@ -17,9 +17,10 @@ TITLE = INIT
       A #lol;
       A #lol2;
       O #lol3
+      AN #lol4
       = #o_out;
 
-      L 10
+      L #value
       T #test
       T #test2
       T #test3

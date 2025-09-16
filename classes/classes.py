@@ -7,7 +7,7 @@ class Var:
 
 @dataclass
 class Not:
-    expr: "Expr"
+    x: "Expr"
 
 @dataclass
 class And:
@@ -30,7 +30,7 @@ def emit_expr(expr: Expr):
     if isinstance(expr, Var):
         return expr.name
     if isinstance(expr, Not):
-        return f"NOT {emit_expr(expr=expr)}"
+        return f"NOT {emit_expr(expr.x)}"
     if isinstance(expr, And):
         return f"{emit_expr(expr.left)} AND {emit_expr(expr.right)}"
     if isinstance(expr, Or):

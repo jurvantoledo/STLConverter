@@ -1,5 +1,5 @@
 from typing import List, Optional
-from classes.classes import Expr, emit_expr, Var, And, Or, Assign
+from classes.classes import Expr, emit_expr, Var, Not, And, Or, Assign
 
 class STLConverter:
     def __init__(self):
@@ -24,7 +24,7 @@ class STLConverter:
             return
     
     def convert_and(self, operand: str):
-        self.stack.append(Var(operand))
+        self.stack.append(operand)
         if len(self.stack) >= 2:
             right = self.stack.pop()
             left = self.stack.pop()
@@ -33,7 +33,7 @@ class STLConverter:
         return self.expr
     
     def convert_or(self, operand: str):
-        self.stack.append(Var(operand))
+        self.stack.append(operand)
         if len(self.stack) >= 2:
             right = self.stack.pop()
             left = self.stack.pop()
@@ -42,7 +42,7 @@ class STLConverter:
         return self.expr
     
     def store_assignment(self, operand: str):
-        target = Var(operand)
+        target = operand
         condition = emit_expr(self.expr)
         scl_code = f"IF {condition} THEN\n{target.name} := true;\nELSE\n {target.name} := false;\nEND_IF;\n"
         self.output.append(scl_code)
@@ -52,19 +52,24 @@ class STLConverter:
     
     def convert_bools(self, opcode: str, operand: str):
         if opcode == "A":
-            self.convert_and(operand)
+            self.convert_and(Var(operand))
+        if opcode == "AN":
+            self.convert_and(Not(Var(operand)))
         if opcode == "O":
-            self.convert_or(operand)
+            self.convert_or(Var(operand))
+        if opcode == "ON":
+            self.convert_or(Not(Var(operand)))
         if opcode == "=":
-            self.store_assignment(operand=operand)
+            self.store_assignment(Var(operand))
         return
     
     def store_transfers(self, dest: str):
         if self.stack:
             var = self.stack[-1]
-            
+        
             self.expr = emit_expr(Assign(target=dest, expr=var))
             self.output.append(self.expr)
+        return
 
     def convert_transfers(self, opcode: str, operand: str):
         if opcode == "L":
