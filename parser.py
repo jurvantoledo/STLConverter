@@ -66,7 +66,6 @@ class STLConverter:
         return
     
     def convert_bools(self, opcode: str, operand: str):
-        print(opcode)
         if opcode == "SET" or opcode == "CLR":
             self.opcode_stack.append(opcode)
             return
@@ -107,10 +106,10 @@ class STLConverter:
         return self.expr
 
     def convert(self, opcode: str, operand: str):
-        if opcode in ("SET", "CLR"):
-            self.convert_bools(opcode=opcode, operand=operand)
+        # if opcode in ("SET", "CLR"):
+        #     self.convert_bools(opcode=opcode, operand=operand)
 
-        if opcode in ("A", "AN", "O", "ON", "="):
+        if opcode in ("A", "AN", "O", "ON", "SET", "CLR", "="):
             self.convert_bools(opcode=opcode, operand=operand)
 
         if opcode in ("L", "T"):
