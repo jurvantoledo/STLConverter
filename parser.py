@@ -11,6 +11,9 @@ class STLConverter:
         self.opcode_stack: List[str] = []
     
     def close_region(self):
+        self.expr = None
+        self.stack.clear()
+        self.opcode_stack.clear()
         self.output.append(f'END_REGION')
         return
     
