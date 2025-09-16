@@ -18,6 +18,14 @@ TITLE = INIT
       A #lol2;
       O #lol3
       = #o_out;
-    
 
+      L 10
+      T #test
+      T #test2
+      T #test3
+      T #test4
+      L 20
+      T #test5
+      T #test6
+      T #test7
 END_FUNCTION_BLOCK
