@@ -14,31 +14,29 @@ BEGIN
 NETWORK
 // Dit is een test
 TITLE = INIT
-      A #lol;
-      A #lol2;
-      O #lol3
-      AN #lol4
-      = #o_out;
+    A #lol1
+    A #lol2
+    O #lol3
+    = #o_out
 
-      L #value
-      T #test
+    L #load
+    T #transfer
+    T #trans2
 
-      SET
-      = #set1
-      = #set2
-      = #set3
-      = #set4
-      = #set5
+    L 10
+    T #Var
+
     
-      CLR
-      = #clr1
-      = #clr2
-      = #clr3
-      = #clr4
-      = #clr5
 
-      A #testAfterSet1
-      AN #testAfterSet2
-      = #o_outAfterSet3
+    A(
+        A #s_Scadabericht.RT_Max;
+        O DINT#36000;
+        = #o_out
+    );
 
+    O(;
+      A #s_Scadabericht.RT_Max;
+      A DINT#36000;
+      = #o_out
+    );
 END_FUNCTION_BLOCK

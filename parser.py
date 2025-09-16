@@ -69,13 +69,13 @@ class STLConverter:
         if opcode == "SET" or opcode == "CLR":
             self.opcode_stack.append(opcode)
             return
-        if opcode == "A":
+        if opcode == "A" or opcode == "A(":
             self.opcode_stack.clear()
             self.convert_and(Var(operand))
         if opcode == "AN":
             self.opcode_stack.clear()
             self.convert_and(Not(Var(operand)))
-        if opcode == "O":
+        if opcode == "O" or opcode == "O(":
             self.opcode_stack.clear()
             self.convert_or(Var(operand))
         if opcode == "ON":
@@ -106,16 +106,15 @@ class STLConverter:
         return self.expr
 
     def convert(self, opcode: str, operand: str):
-        # if opcode in ("SET", "CLR"):
-        #     self.convert_bools(opcode=opcode, operand=operand)
-
-        if opcode in ("A", "AN", "O", "ON", "SET", "CLR", "="):
+        if operand is None:
+            return
+        
+        if opcode in ("A", "AN", "O", "ON", "A(", "O(", "SET", "CLR", "="):
             self.convert_bools(opcode=opcode, operand=operand)
 
         if opcode in ("L", "T"):
             self.convert_transfers(opcode=opcode, operand=operand)
             
     def ret_output(self):
-        # print(self.output)
         self.close_region()
         return self.output

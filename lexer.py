@@ -19,6 +19,6 @@ def lexer(body: List):
                 tokenized.append({"type": "INSTRUCTION", 'opcode': opcode, 'operand': operand})
                 continue
             else:
-                tokenized.append({"type": "INSTRUCTION", 'opcode': part[0]})
+                tokenized.append({"type": "INSTRUCTION", 'opcode': part[0].rstrip(";")})
     print(tokenized)
     return tokenized
