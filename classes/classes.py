@@ -24,7 +24,13 @@ class Assign:
     target: Var
     expr: "Expr"
 
-Expr = Union[Var, Not, And, Or, Assign]
+@dataclass
+class BinOp:
+    left: "Expr"
+    op: str
+    right: "Expr"
+
+Expr = Union[Var, Not, And, Or, Assign, BinOp]
 
 def emit_expr(expr: Expr):
     if isinstance(expr, Var):
@@ -37,3 +43,5 @@ def emit_expr(expr: Expr):
         return f"{emit_expr(expr.left)} OR {emit_expr(expr.right)}"
     if isinstance(expr, Assign):
         return f"{emit_expr(expr.target)} := {emit_expr(expr.expr)}\n"
+    if isinstance(expr, BinOp):
+        return f"{emit_expr(expr.left)} {expr.op} {emit_expr(expr.right)}"

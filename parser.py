@@ -1,11 +1,12 @@
 from typing import List, Optional
-from classes.classes import Expr, emit_expr, Var, Not, And, Or, Assign
+from stl_operators import arithmetic_operators
+from classes.classes import Expr, emit_expr, Var, Not, And, Or, BinOp, Assign
 
 class STLConverter:
     def __init__(self):
         self.expr: Optional[Expr] = None
         self.output: List[str] = []
-
+        self.op = None
         # Stack to push instructions if not all conditions are made
         self.stack: List[Expr] = []
         self.opcode_stack: List[str] = []
@@ -66,19 +67,19 @@ class STLConverter:
         return
     
     def convert_bools(self, opcode: str, operand: str):
-        if opcode == "SET" or opcode == "CLR":
+        if opcode == "SET" or opcode == "CLR" or operand is None:
             self.opcode_stack.append(opcode)
             return
         if opcode == "A" or opcode == "A(":
             self.opcode_stack.clear()
             self.convert_and(Var(operand))
-        if opcode == "AN":
+        if opcode == "AN" or opcode == "AN(":
             self.opcode_stack.clear()
             self.convert_and(Not(Var(operand)))
         if opcode == "O" or opcode == "O(":
             self.opcode_stack.clear()
             self.convert_or(Var(operand))
-        if opcode == "ON":
+        if opcode == "ON" or opcode == "ON(":
             self.opcode_stack.clear()
             self.convert_or(Not(Var(operand)))
         if opcode == "=":
@@ -95,7 +96,6 @@ class STLConverter:
             self.expr = emit_expr(Assign(target=dest, expr=var))
             self.output.append(self.expr)
             self.expr = None
-            self.stack.clear()
         return
 
     def convert_transfers(self, opcode: str, operand: str):
@@ -104,16 +104,39 @@ class STLConverter:
         if opcode == "T":
             self.store_transfers(Var(operand))
         return self.expr
-
-    def convert(self, opcode: str, operand: str):
-        if operand is None:
-            return
+    
+    def store_arithmetic_transfers(self, op: str, dest: str):
+        if len(self.stack) >= 2:
+            left = self.stack.pop()
+            right = self.stack.pop()
         
-        if opcode in ("A", "AN", "O", "ON", "A(", "O(", "SET", "CLR", "="):
+            condition = BinOp(left=left, op=op, right=right)
+            self.expr = emit_expr(Assign(target=dest, expr=condition))
+            self.output.append(self.expr)
+            self.expr = None
+            self.op = None
+            self.stack.clear()
+        return
+        
+    def convert_arithmetic_operators(self, opcode, op, operand):
+        if op:
+            if opcode == "L":
+                self.stack.append(Var(operand))
+            if opcode == "T":
+                self.store_arithmetic_transfers(op, Var(operand))
+            return
+
+    def convert(self, opcode: str, operand: str):    
+        if opcode in ("A", "AN", "O", "ON", "A(", "O(", "AN(", "ON(", "SET", "CLR", "="):
             self.convert_bools(opcode=opcode, operand=operand)
 
-        if opcode in ("L", "T"):
-            self.convert_transfers(opcode=opcode, operand=operand)
+        if opcode in ("L", "T") or opcode in arithmetic_operators:
+            if opcode in arithmetic_operators:
+                self.op = arithmetic_operators[opcode]
+            if self.op is None:
+                self.convert_transfers(opcode=opcode, operand=operand)
+            else:
+                self.convert_arithmetic_operators(opcode=opcode, op=self.op, operand=operand)
             
     def ret_output(self):
         self.close_region()
