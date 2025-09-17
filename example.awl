@@ -34,7 +34,7 @@ TITLE = INIT
 
     L #s_OmrekenenTOD.TijdZonderUrenIn10nSec;
     L #s_Scadabericht.ScadaOntvangstTijd;
-    -D;
+    >D;
     T #t_ActueelTijdverschil;
 
 END_FUNCTION_BLOCK

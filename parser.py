@@ -1,5 +1,5 @@
 from typing import List, Optional
-from stl_operators import arithmetic_operators
+from stl_operators import arithmetic_operators, relational_operators
 from classes.classes import Expr, emit_expr, Var, Not, And, Or, BinOp, Assign
 
 class STLConverter:
@@ -130,9 +130,11 @@ class STLConverter:
         if opcode in ("A", "AN", "O", "ON", "A(", "O(", "AN(", "ON(", "SET", "CLR", "="):
             self.convert_bools(opcode=opcode, operand=operand)
 
-        if opcode in ("L", "T") or opcode in arithmetic_operators:
+        if opcode in ("L", "T") or opcode in arithmetic_operators or opcode in relational_operators:
             if opcode in arithmetic_operators:
                 self.op = arithmetic_operators[opcode]
+            if opcode in relational_operators:
+                self.op = relational_operators[opcode]
             if self.op is None:
                 self.convert_transfers(opcode=opcode, operand=operand)
             else:
