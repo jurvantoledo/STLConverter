@@ -14,27 +14,13 @@ BEGIN
 NETWORK
 // Dit is een test
 TITLE = INIT
-    A #lol1
-    A #lol2
-    O #lol3
-    = #o_out
+    L 254;
+    T #t_MaxWaardeVoorOverflow;
+    ITD;
+    T #t_MaxWaardeOverflowDINT;
 
-    L 10;
-    T #test1;
-    T #test2;
-    T #test3;
-    T #test4;
-    T #test5;
-    T #test6;
-    L 31
-    T #newTest1
-    T #newTest2
-    T #newTest3
-    T #newTest4
-
-    L #s_OmrekenenTOD.TijdZonderUrenIn10nSec;
-    L #s_Scadabericht.ScadaOntvangstTijd;
-    >D;
-    T #t_ActueelTijdverschil;
-
+    L  1000
+    ITD
+    DTR
+    T #RealValue
 END_FUNCTION_BLOCK
